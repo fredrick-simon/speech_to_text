@@ -1,37 +1,35 @@
-# Import necessary libraries
 import streamlit as st
+from streamlit_webrtc import webrtc_streamer
 import speech_recognition as sr
 
-# Set page title
-st.title("Speech-to-Text Converter")
-
-# Create a function to convert speech to text
-def speech_to_text(language='en-US'):
-    # Create instance of Recognizer
+def transcribe_audio(audio_data):
     recognizer = sr.Recognizer()
+    with sr.AudioFile(audio_data) as source:
+        audio = recognizer.record(source)
+    try:
+        return recognizer.recognize_google(audio)
+    except sr.UnknownValueError:
+        return "Sorry, couldn't understand the audio"
+    except sr.RequestError:
+        return "Speech recognition service unavailable"
 
-    # Use microphone as audio source
-    with sr.Microphone() as source:
-        st.write("Speak something...")
-        # Adjust for ambient noise
-        recognizer.adjust_for_ambient_noise(source)
-        # Listen for user input
-        audio = recognizer.listen(source)
-        try:
-            st.write("Transcription:")
-            # Use recognize_google method to transcribe speech
-            text = recognizer.recognize_google(audio, language=language)
-            # Display transcribed text
-            st.write(text)
-        except sr.UnknownValueError:
-            st.write("Sorry, couldn't understand audio.")
-        except sr.RequestError as e:
-            st.write(f"Request error: {e}")
+def main():
+    st.title("Live Speech-to-Text")
+    webrtc_ctx = webrtc_streamer(
+        key="speech-to-text",
+        audio_receiver_size=1024,
+        desired_playing_speed=1,
+        media_stream_constraints={"audio": True},
+        run_button_label="Start",
+    )
+    if webrtc_ctx.audio_receiver:
+        audio_data = webrtc_ctx.audio_receiver.value
+        if st.button("Transcribe"):
+            if audio_data is not None:
+                st.write("Transcription in progress...")
+                text = transcribe_audio(audio_data)
+                st.write("Transcription:")
+                st.write(text)
 
-# Create sidebar for customization options
-st.sidebar.title("Settings")
-language = st.sidebar.selectbox("Select Language", ['en-US', 'es-ES'])
-
-# Call speech_to_text function when button is clicked
-if st.button("Start Recording"):
-    speech_to_text(language)
+if __name__ == "__main__":
+    main()
